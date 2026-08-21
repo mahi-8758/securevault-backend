@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+
+# Logs and runtime output
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test and coverage output
+coverage/
+.nyc_output/
+
+# Build and deployment artifacts
+dist/
+build/
+.tmp/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Generated local files
+*.local
