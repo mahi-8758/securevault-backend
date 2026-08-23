@@ -4,7 +4,16 @@ const { DynamoDBDocumentClient, QueryCommand } = require('@aws-sdk/lib-dynamodb'
 const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
 function response(statusCode, body) {
-  return { statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+  return {
+    statusCode,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': 'http://localhost:8080',
+      'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+      'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'
+    },
+    body: JSON.stringify(body)
+  };
 }
 
 function getOwnerId(event) {

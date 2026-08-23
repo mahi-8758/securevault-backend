@@ -5,13 +5,15 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "build:lambda": "node scripts/build-lambda.js"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.859.0",
     "@aws-sdk/client-s3": "^3.859.0",
     "@aws-sdk/lib-dynamodb": "^3.859.0",
     "@aws-sdk/s3-request-presigner": "^3.859.0",
+    "archiver": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",

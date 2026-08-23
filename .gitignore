@@ -1,32 +1,61 @@
 # Dependencies
 node_modules/
 
-# Local secrets and environment files
+# Environment & Configuration Files
 .env
+.env.local
+.env.development
+.env.test
+.env.production
 .env.*
 !.env.example
+!.env.template
+config.local.js
+config.local.json
 
-# Logs and runtime output
+# Private Data & CLI Payload Files
+owner-values.json
+*-values.json
+*.values.json
+*.secret.json
+credentials.json
+secrets/
+
+# Keys & Certificates
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+
+# Logs and Runtime Output
 *.log
 logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Test and coverage output
+# Test, Temporary & Coverage Output
 coverage/
 .nyc_output/
+test.txt
+*.tmp
 
-# Build and deployment artifacts
+# Build, Zip & Deployment Artifacts
 dist/
 build/
 .tmp/
+lambda-build/
+*.zip
+.serverless/
+.aws-sam/
 
-# OS and editor files
+# OS and Editor Files
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 
-# Generated local files
+# Generated Local Files
 *.local
+

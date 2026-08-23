@@ -8,7 +8,16 @@ const s3 = new S3Client({});
 const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
 function response(statusCode, body) {
-  return { statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+  return {
+    statusCode,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': 'http://localhost:8080',
+      'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+      'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'
+    },
+    body: JSON.stringify(body)
+  };
 }
 
 function getOwnerId(event) {
@@ -24,7 +33,10 @@ exports.handler = async (event) => {
     return response(500, { success: false, message: 'Storage configuration is incomplete.' });
   }
 
-  const body = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : (event.body || {});
+  const requestBody = typeof event.body === 'string'
+    ? (event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf-8') : event.body)
+    : event.body;
+  const body = typeof requestBody === 'string' ? JSON.parse(requestBody || '{}') : (requestBody || {});
   const fileName = String(body.fileName || '').trim();
   if (!fileName) return response(400, { success: false, message: 'fileName is required.' });
 
@@ -36,6 +48,24 @@ exports.handler = async (event) => {
     TableName: process.env.METADATA_TABLE,
     Item: { fileId, ownerId, fileName, fileType: body.fileType || 'OTHER', size: Number(body.size || 0), s3Key: key, uploadedAt: new Date().toISOString(), status: 'Encrypted' }
   }));
+
+  if (process.env.AUDIT_TABLE) {
+    try {
+      await dynamo.send(new PutCommand({
+        TableName: process.env.AUDIT_TABLE,
+        Item: {
+          ownerId,
+          fileId,
+          fileName,
+          action: 'UPLOAD',
+          status: 'Success',
+          timestamp: new Date().toISOString()
+        }
+      }));
+    } catch (error) {
+      console.error('[SecureVault] Upload audit logging failed', error);
+    }
+  }
 
   return response(201, { success: true, fileId, uploadUrl });
 };

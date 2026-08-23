@@ -7,7 +7,16 @@ const s3 = new S3Client({});
 const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
 function response(statusCode, body) {
-  return { statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+  return {
+    statusCode,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': 'http://localhost:8080',
+      'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+      'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'
+    },
+    body: JSON.stringify(body)
+  };
 }
 
 function getOwnerId(event) {
@@ -19,6 +28,9 @@ function getOwnerId(event) {
 exports.handler = async (event) => {
   const ownerId = getOwnerId(event);
   if (!ownerId) return response(401, { success: false, message: 'Authentication required.' });
+  if (!process.env.AUDIT_TABLE) {
+    return response(500, { success: false, message: 'Audit logging configuration is incomplete.' });
+  }
   const fileId = event?.pathParameters?.fileId;
   if (!fileId) return response(400, { success: false, message: 'fileId is required.' });
 
@@ -28,8 +40,6 @@ exports.handler = async (event) => {
   if (file.ownerId !== ownerId) return response(403, { success: false, message: 'You do not own this file.' });
 
   const downloadUrl = await getSignedUrl(s3, new GetObjectCommand({ Bucket: process.env.FILES_BUCKET, Key: file.s3Key }), { expiresIn: 900 });
-  if (process.env.AUDIT_TABLE) {
-    await dynamo.send(new PutCommand({ TableName: process.env.AUDIT_TABLE, Item: { logId: `${Date.now()}-${fileId}`, ownerId, fileId, fileName: file.fileName, action: 'DOWNLOAD', dateTime: new Date().toISOString(), status: 'Success' } }));
-  }
+  await dynamo.send(new PutCommand({ TableName: process.env.AUDIT_TABLE, Item: { fileId, timestamp: new Date().toISOString(), ownerId, fileName: file.fileName, action: 'DOWNLOAD', status: 'Success' } }));
   return response(200, { success: true, fileId, downloadUrl });
 };
