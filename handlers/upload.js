@@ -7,14 +7,24 @@ const { DynamoDBDocumentClient, PutCommand } = require('@aws-sdk/lib-dynamodb');
 const s3 = new S3Client({});
 const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
-function response(statusCode, body) {
+const ALLOWED_ORIGINS = [
+  'http://localhost:8080',
+  'https://main.d3a1aca3sc3925.amplifyapp.com'
+];
+
+function getCorsOrigin(event) {
+  const requestOrigin = event?.headers?.origin || event?.headers?.Origin;
+  return ALLOWED_ORIGINS.includes(requestOrigin) ? requestOrigin : ALLOWED_ORIGINS[0];
+}
+
+function response(statusCode, body, event) {
   return {
     statusCode,
     headers: {
       'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': 'http://localhost:8080',
+      'Access-Control-Allow-Origin': getCorsOrigin(event),
       'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-      'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'
+      'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS'
     },
     body: JSON.stringify(body)
   };
@@ -28,9 +38,9 @@ function getOwnerId(event) {
 
 exports.handler = async (event) => {
   const ownerId = getOwnerId(event);
-  if (!ownerId) return response(401, { success: false, message: 'Authentication required.' });
+  if (!ownerId) return response(401, { success: false, message: 'Authentication required.' }, event);
   if (!process.env.FILES_BUCKET || !process.env.METADATA_TABLE) {
-    return response(500, { success: false, message: 'Storage configuration is incomplete.' });
+    return response(500, { success: false, message: 'Storage configuration is incomplete.' }, event);
   }
 
   const requestBody = typeof event.body === 'string'
@@ -38,7 +48,7 @@ exports.handler = async (event) => {
     : event.body;
   const body = typeof requestBody === 'string' ? JSON.parse(requestBody || '{}') : (requestBody || {});
   const fileName = String(body.fileName || '').trim();
-  if (!fileName) return response(400, { success: false, message: 'fileName is required.' });
+  if (!fileName) return response(400, { success: false, message: 'fileName is required.' }, event);
 
   const fileId = uuid();
   const key = `${ownerId}/${fileId}-${fileName}`;
@@ -67,5 +77,5 @@ exports.handler = async (event) => {
     }
   }
 
-  return response(201, { success: true, fileId, uploadUrl });
+  return response(201, { success: true, fileId, uploadUrl }, event);
 };

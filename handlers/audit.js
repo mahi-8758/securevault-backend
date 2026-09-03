@@ -3,14 +3,24 @@ const { DynamoDBDocumentClient, QueryCommand } = require('@aws-sdk/lib-dynamodb'
 
 const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
-function response(statusCode, body) {
+const ALLOWED_ORIGINS = [
+  'http://localhost:8080',
+  'https://main.d3a1aca3sc3925.amplifyapp.com'
+];
+
+function getCorsOrigin(event) {
+  const requestOrigin = event?.headers?.origin || event?.headers?.Origin;
+  return ALLOWED_ORIGINS.includes(requestOrigin) ? requestOrigin : ALLOWED_ORIGINS[0];
+}
+
+function response(statusCode, body, event) {
   return {
     statusCode,
     headers: {
       'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': 'http://localhost:8080',
+      'Access-Control-Allow-Origin': getCorsOrigin(event),
       'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-      'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'
+      'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS'
     },
     body: JSON.stringify(body)
   };
@@ -24,7 +34,7 @@ function getOwnerId(event) {
 
 exports.handler = async (event) => {
   const ownerId = getOwnerId(event);
-  if (!ownerId) return response(401, { success: false, message: 'Authentication required.' });
+  if (!ownerId) return response(401, { success: false, message: 'Authentication required.' }, event);
   const fileId = event?.queryStringParameters?.fileId;
   const query = { TableName: process.env.AUDIT_TABLE, KeyConditionExpression: 'ownerId = :ownerId', ExpressionAttributeValues: { ':ownerId': ownerId } };
   if (process.env.AUDIT_OWNER_INDEX) query.IndexName = process.env.AUDIT_OWNER_INDEX;
@@ -33,5 +43,5 @@ exports.handler = async (event) => {
     query.ExpressionAttributeValues[':fileId'] = fileId;
   }
   const result = await dynamo.send(new QueryCommand(query));
-  return response(200, { success: true, logs: result.Items || [] });
+  return response(200, { success: true, logs: result.Items || [] }, event);
 };

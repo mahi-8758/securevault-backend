@@ -5,12 +5,22 @@ const { DynamoDBDocumentClient, DeleteCommand, GetCommand, PutCommand } = requir
 const s3 = new S3Client({});
 const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
-function response(statusCode, body) {
+const ALLOWED_ORIGINS = [
+  'http://localhost:8080',
+  'https://main.d3a1aca3sc3925.amplifyapp.com'
+];
+
+function getCorsOrigin(event) {
+  const requestOrigin = event?.headers?.origin || event?.headers?.Origin;
+  return ALLOWED_ORIGINS.includes(requestOrigin) ? requestOrigin : ALLOWED_ORIGINS[0];
+}
+
+function response(statusCode, body, event) {
   return {
     statusCode,
     headers: {
       'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': 'http://localhost:8080',
+      'Access-Control-Allow-Origin': getCorsOrigin(event),
       'Access-Control-Allow-Headers': 'Content-Type,Authorization',
       'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS'
     },
@@ -27,16 +37,16 @@ function getOwnerId(event) {
 exports.handler = async (event) => {
   const ownerId = getOwnerId(event);
   if (!ownerId) {
-    return response(401, { success: false, message: 'Authentication required.' });
+    return response(401, { success: false, message: 'Authentication required.' }, event);
   }
 
   if (!process.env.FILES_BUCKET || !process.env.METADATA_TABLE || !process.env.AUDIT_TABLE) {
-    return response(500, { success: false, message: 'Storage configuration is incomplete.' });
+    return response(500, { success: false, message: 'Storage configuration is incomplete.' }, event);
   }
 
   const fileId = event?.pathParameters?.fileId;
   if (!fileId) {
-    return response(400, { success: false, message: 'fileId is required.' });
+    return response(400, { success: false, message: 'fileId is required.' }, event);
   }
 
   let file;
@@ -47,15 +57,15 @@ exports.handler = async (event) => {
     }));
     file = result.Item;
   } catch (error) {
-    return response(500, { success: false, message: 'Unable to read file metadata.' });
+    return response(500, { success: false, message: 'Unable to read file metadata.' }, event);
   }
 
   if (!file) {
-    return response(404, { success: false, message: 'File not found.' });
+    return response(404, { success: false, message: 'File not found.' }, event);
   }
 
   if (file.ownerId !== ownerId) {
-    return response(403, { success: false, message: 'You do not own this file.' });
+    return response(403, { success: false, message: 'You do not own this file.' }, event);
   }
 
   try {
@@ -84,7 +94,7 @@ exports.handler = async (event) => {
     return response(200, {
       success: true,
       message: 'File deleted successfully.'
-    });
+    }, event);
   } catch (error) {
     try {
       await dynamo.send(new PutCommand({
@@ -105,6 +115,6 @@ exports.handler = async (event) => {
     return response(500, {
       success: false,
       message: error.message || 'Delete failed.'
-    });
+    }, event);
   }
 };
